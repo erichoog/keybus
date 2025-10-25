@@ -57,15 +57,15 @@ static DEFINE_MUTEX(keybus_mutex);
 
 // gpio stuff
 static bool active_low = 0;
-module_param(active_low, bool, S_IRUGO);
+module_param(active_low, bool, 0444);
 MODULE_PARM_DESC(active_low, " Active low: Inverted = 1, Normal = 0");
 
 static unsigned int gpio_clk = 24;
-module_param(gpio_clk, uint, S_IRUGO);
+module_param(gpio_clk, uint, 0444);
 MODULE_PARM_DESC(gpio_clk, " GPIO Clock number (default=24)");
 
 static unsigned int gpio_data = 23;
-module_param(gpio_data, uint, S_IRUGO);
+module_param(gpio_data, uint, 0444);
 MODULE_PARM_DESC(gpio_data, " GPIO Data number (default=23)");
 
 // irq stuff
@@ -153,11 +153,11 @@ static struct attribute_group attr_group = {
 
 static struct kobject *keybus_kobj;
 
-static irqreturn_t clk_irq_handler(unsigned int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t clk_irq_handler(int irq, void *dev_id);
 
 static int __init keybus_init(void) {
     int result;
-    unsigned long flags = GPIOF_DIR_IN | (active_low ? GPIOF_ACTIVE_LOW : 0);
+    unsigned long flags = GPIOF_IN | (active_low ? GPIOF_ACTIVE_LOW : 0);
 
     in_packets.head = 0;
     in_packets.tail = 0;
@@ -184,9 +184,10 @@ static int __init keybus_init(void) {
     }
 
     result = request_irq(irq_number,
-                         (irq_handler_t) clk_irq_handler,
-                         flags, "keybusdev_clk_handler",
-                         NULL);
+                        clk_irq_handler,
+                        flags,
+                        "keybusdev_clk_handler",
+                        NULL);
 
     if (result < 0) {
         printk(KERN_ALERT "%s: failed to request irq for clk: %d\n", DEVICE_NAME, result);
@@ -219,7 +220,7 @@ static int __init keybus_init(void) {
     }
 
     // Register the device class
-    keybus_class = class_create(THIS_MODULE, CLASS_NAME);
+    keybus_class = class_create(CLASS_NAME);
     if (IS_ERR(keybus_class)) {
         unregister_chrdev(major_number, DEVICE_NAME);
         printk(KERN_ALERT "%s: failed to register a device class\n", DEVICE_NAME);
@@ -266,7 +267,7 @@ static void debug_print_packet(char* msg, char* packet) { // of length PACKET_MA
 }
 #endif
 
-static irqreturn_t clk_irq_handler(unsigned int irq, void *dev_id, struct pt_regs *regs) {
+static irqreturn_t clk_irq_handler(int irq, void *dev_id) {
     static struct timespec64 ts_current, ts_diff;
     static int num_bits = IRQ_HANDLER_INIT;
     static int max_packet_bits = (PACKET_MAX_LEN - 1) * 8;
